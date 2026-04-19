@@ -65,21 +65,12 @@ def create_word_document(content, topic_name):
         line = line.strip()
         if not line:
             doc.add_paragraph()
-        elif line.startswith('#'):
-            para = doc.add_heading(level=1)
-            for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip()):
-                if part.startswith('**') and part.endswith('**'):
-                    run = para.add_run(part[2:-2])
-                    run.bold = True
-                elif part.startswith('*') and part.endswith('*'):
-                    run = para.add_run(part[1:-1])
-                    run.italic = True
-                else:
-                    para.add_run(part)
-        elif line.startswith('##'):
-            doc.add_heading(line.replace('##', '').strip(), level=2)
         elif line.startswith('###'):
             doc.add_heading(line.replace('###', '').strip(), level=3)
+        elif line.startswith('##'):
+            doc.add_heading(line.replace('##', '').strip(), level=2)
+        elif line.startswith('#'):
+            doc.add_heading(line[1:].strip(), level=1)
         elif line.startswith('-') or line.startswith('*'):
             para = doc.add_paragraph(style='List Bullet')
             for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip()):
@@ -92,34 +83,7 @@ def create_word_document(content, topic_name):
                 else:
                     para.add_run(part)
         elif '|' in line:
-            cells = [c.strip() for c in line.split('|') if c.strip()]
-            if not hasattr(doc, 'current_table'):
-                doc.current_table = doc.add_table(rows=1, cols=len(cells))
-                hdr_cells = doc.current_table.rows[0].cells
-                for i, cell in enumerate(cells):
-                    para = hdr_cells[i].paragraphs[0]
-                    for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', cell):
-                        if part.startswith('**') and part.endswith('**'):
-                            run = para.add_run(part[2:-2])
-                            run.bold = True
-                        elif part.startswith('*') and part.endswith('*'):
-                            run = para.add_run(part[1:-1])
-                            run.italic = True
-                        else:
-                            para.add_run(part)
-            else:
-                row_cells = doc.current_table.add_row().cells
-                for i, cell in enumerate(cells):
-                    para = row_cells[i].paragraphs[0]
-                    for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', cell):
-                        if part.startswith('**') and part.endswith('**'):
-                            run = para.add_run(part[2:-2])
-                            run.bold = True
-                        elif part.startswith('*') and part.endswith('*'):
-                            run = para.add_run(part[1:-1])
-                            run.italic = True
-                        else:
-                            para.add_run(part)
+            continue
         else:
             para = doc.add_paragraph()
             for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', line):
