@@ -9,9 +9,9 @@ import re
 
 # --- Konfigurasi Halaman ---
 st.set_page_config(
-    page_title="AI Lesson Plan Generator",
-    page_icon="📚",
-    layout="centered"
+    page_title="AI Lesson Plan Generator",
+    page_icon="📚",
+    layout="centered"
 )
 
 # --- Header ---
