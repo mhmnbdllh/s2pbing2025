@@ -44,7 +44,7 @@ kelas_options = [
     "Kelas X SMA", "Kelas XI SMA", "Kelas XII SMA"
 ]
 
-# --- Fungsi membuat file Word (HANYA INI YANG DIPERBAIKI) ---
+# --- Fungsi membuat file Word (DIPERBAIKI) ---
 def create_word_document(content, topic_name):
     doc = Document()
     
@@ -67,23 +67,28 @@ def create_word_document(content, topic_name):
             doc.add_paragraph()
             continue
         
+        # Hapus semua markdown bold (**teks**)
+        line = re.sub(r'\*\*([^*]+)\*\*', r'\1', line)
+        
         # Heading level 2 (##)
         if line.startswith('##'):
-            doc.add_heading(line.lstrip('#').strip(), level=2)
+            heading_text = line.lstrip('#').strip()
+            doc.add_heading(heading_text, level=2)
             continue
         
         # Heading level 3 (###)
         if line.startswith('###'):
-            doc.add_heading(line.lstrip('#').strip(), level=3)
+            heading_text = line.lstrip('#').strip()
+            doc.add_heading(heading_text, level=3)
             continue
         
-        # List bullet
+        # List bullet dengan - atau *
         if line.startswith('-') or line.startswith('*'):
-            doc.add_paragraph(line[1:].strip(), style='List Bullet')
+            bullet_text = line[1:].strip()
+            doc.add_paragraph(bullet_text, style='List Bullet')
             continue
         
-        # Paragraf biasa - hapus markdown bold
-        line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
+        # Paragraf biasa
         doc.add_paragraph(line)
     
     from datetime import datetime
