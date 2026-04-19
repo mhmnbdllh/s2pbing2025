@@ -87,9 +87,18 @@ def create_word_document(content, topic_name):
     doc_bytes.seek(0)
     return doc_bytes
 
-# --- Fungsi panggil Gemini ---
-def call_gemini(prompt_text):
-    model = genai.GenerativeModel(MODEL_NAME)
+# --- Fungsi panggil Gemini dengan System Instruction ---
+def call_gemini(prompt_text, language):
+    # SYSTEM INSTRUCTION TEKNIS UNTUK MEMAKSA BAHASA
+    if language == "Indonesian":
+        system_instruction = "Anda adalah asisten guru yang hanya merespon dalam Bahasa Indonesia. Anda tidak pernah menggunakan Bahasa Inggris sama sekali. Semua judul, deskripsi, dan konten harus dalam Bahasa Indonesia murni."
+    else:
+        system_instruction = "You are a teacher assistant who only responds in English. You never use Indonesian language at all. All headings, descriptions, and content must be in pure English."
+    
+    model = genai.GenerativeModel(
+        MODEL_NAME,
+        system_instruction=system_instruction
+    )
     
     for attempt in range(3):
         try:
@@ -206,46 +215,28 @@ if submitted:
         st.session_state.current_topic = topic
         
         with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
-            if language == "Indonesian":
-                struktur = """
-                1. KOMPETENSI AWAL
-                2. PROFIL PELAJAR PANCASILA
-                3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
-                4. PENILAIAN
-                """
-                waktu_unit = "Menit"
-            else:
-                struktur = """
-                1. INITIAL COMPETENCIES
-                2. PANCASILA STUDENT PROFILE
-                3. LEARNING ACTIVITIES (Opening, Core, Closing)
-                4. ASSESSMENT
-                """
-                waktu_unit = "minutes"
-            
             prompt = f"""
-            Buat Lesson Plan dalam BAHASA {language} YANG DIPILIH.
+            Buat Lesson Plan dengan detail:
+            Topik: {topic}
+            Kelas: {grade}
+            Standar 1: {std1}
+            Standar 2: {std2}
+            Waktu: {time_minutes} menit
+
+            OUTPUTNYA WAJIB DALAM 1 BAHASA (FULL ENGLISH ATAU FULL INDONESIA, BERDASARKAN Language {language}. Integrasikan kearifan lokal Jawa Timur.
             
-            Detail:
-            Topic: {topic}
-            Grade: {grade}
-            Language: {language}
-            Standard 1: {std1}
-            Standard 2: {std2}
-            Time: {time_minutes} {waktu_unit}
+            Struktur:
+            1. Kompetensi Awal
+            2. Profil Pelajar Pancasila
+            3. Kegiatan Pembelajaran (Pendahuluan, Inti, Penutup)
+            4. Penilaian
             
-            Integrate local wisdom of East Java.
-            
-            Structure (dalam {language}):
-            {struktur}
-            
-            Format: ## untuk judul, ### untuk sub judul, - untuk list, **teks** untuk penekanan.
-            
-            Mulai langsung ke konten, tanpa kata pengantar.
+            Gunakan format ## untuk judul, ### untuk sub judul, - untuk list.
+            Langsung ke konten.
             """
             # --- END OF PROMPT ---
             
-            result = call_gemini(prompt)
+            result = call_gemini(prompt, language)
             
             if result:
                 st.session_state.generated_content = result
@@ -254,7 +245,6 @@ if submitted:
             else:
                 st.error("Gagal menghasilkan. Silakan coba lagi.")
 
-# --- Tampilkan hasil jika ada ---
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
     
