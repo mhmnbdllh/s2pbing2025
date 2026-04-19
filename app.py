@@ -206,7 +206,6 @@ if submitted:
         st.session_state.current_topic = topic
         
         with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
-            # --- PERBAIKAN: STRUKTUR DINAMIS BERDASARKAN BAHASA ---
             if language == "Indonesian":
                 struktur = """
                 1. KOMPETENSI AWAL
@@ -225,11 +224,12 @@ if submitted:
                 waktu_unit = "minutes"
             
             prompt = f"""
-            Buat Lesson Plan dalam BAHASA {language} MURNI. Jangan campur dengan bahasa lain.
+            Buat Lesson Plan dalam BAHASA {language} YANG DIPILIH.
             
             Detail:
             Topic: {topic}
             Grade: {grade}
+            Language: {language}
             Standard 1: {std1}
             Standard 2: {std2}
             Time: {time_minutes} {waktu_unit}
