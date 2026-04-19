@@ -14,7 +14,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- Header sederhana ---
+# --- Header ---
 st.title("📚 AI Lesson Plan Generator")
 st.caption("Powered by Google Gemini AI | Generate RPP berkualitas dengan muatan kearifan lokal Jawa Timur")
 
@@ -37,25 +37,29 @@ if 'is_generated' not in st.session_state:
 if 'current_topic' not in st.session_state:
     st.session_state.current_topic = ""
 
+# --- Dropdown Kelas ---
+kelas_options = [
+    "Kelas 1 SD", "Kelas 2 SD", "Kelas 3 SD", "Kelas 4 SD", "Kelas 5 SD", "Kelas 6 SD",
+    "Kelas VII SMP", "Kelas VIII SMP", "Kelas IX SMP",
+    "Kelas X SMA", "Kelas XI SMA", "Kelas XII SMA"
+]
+
 # --- Fungsi membuat file Word ---
 def create_word_document(content, topic_name):
     doc = Document()
     
-    # Margin
     for section in doc.sections:
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
     
-    # Judul
     title = doc.add_heading('RENCANA PELAKSANAAN PEMBELAJARAN (RPP)', level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     doc.add_paragraph(f"Topik: {topic_name}")
     doc.add_paragraph('_' * 50)
     
-    # Bersihkan dan tambahkan konten
     lines = content.split('\n')
     for line in lines:
         line = line.strip()
@@ -68,11 +72,9 @@ def create_word_document(content, topic_name):
         elif line.startswith('-') or line.startswith('*'):
             doc.add_paragraph(line[1:].strip(), style='List Bullet')
         else:
-            # Hapus markdown bold
             clean_line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
             doc.add_paragraph(clean_line)
     
-    # Footer
     from datetime import datetime
     footer = doc.sections[0].footer
     footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
@@ -99,7 +101,6 @@ def call_gemini(prompt_text):
                 }
             )
             content = response.text
-            # Bersihkan markdown wrapper
             content = re.sub(r'^```\w*\n?', '', content)
             content = re.sub(r'\n?```$', '', content)
             return content.strip()
@@ -115,78 +116,136 @@ with st.form("lesson_form"):
     topic = st.text_area(
         "📖 **Topik Pembelajaran**",
         height=80,
-        placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa SD Kelas 5",
-        help="Maksimal 100 kata"
+        placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
+        help="Minimal 3 kata, maksimal 100 kata"
     )
     
     col1, col2 = st.columns(2)
     with col1:
         language = st.selectbox("🌐 Bahasa", ["Indonesian", "English"], index=0)
-        grade = st.text_input("🎓 Kelas", placeholder="Kelas 5 SD")
+        grade = st.selectbox("🎓 Kelas", kelas_options, index=4)
     with col2:
-        std1 = st.text_area("🎯 Standar 1 (Capaian Pembelajaran)", height=60)
-        std2 = st.text_area("📝 Standar 2 (Tujuan Pembelajaran)", height=60)
+        std1 = st.text_area(
+            "🎯 Standar 1 (Capaian Pembelajaran)", 
+            height=60,
+            help="Minimal 2 kata, maksimal 25 kata"
+        )
+        std2 = st.text_area(
+            "📝 Standar 2 (Tujuan Pembelajaran)", 
+            height=60,
+            help="Minimal 2 kata, maksimal 25 kata"
+        )
     
-    time_allotment = st.text_input("⏰ Alokasi Waktu", placeholder="2 x 35 menit")
+    time_minutes = st.text_input(
+        "⏰ Alokasi Waktu (Menit)",
+        placeholder="Contoh: 60",
+        help="Hanya angka, maksimal 3 digit (contoh: 60, 90, 120)"
+    )
     
     submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
 
-# --- Proses Generate ---
+# --- Validasi dan Proses Generate ---
 if submitted:
+    valid = True
+    
+    # Validasi TOPIK (min 3 kata, max 100 kata)
     if not topic.strip():
-        st.error("Topik tidak boleh kosong!")
-        st.stop()
+        st.error("❌ Topik tidak boleh kosong!")
+        valid = False
+    else:
+        word_count_topic = len(topic.strip().split())
+        if word_count_topic < 3:
+            st.error(f"❌ Topik minimal 3 kata! Saat ini: {word_count_topic} kata")
+            valid = False
+        elif word_count_topic > 100:
+            st.error(f"❌ Topik maksimal 100 kata! Saat ini: {word_count_topic} kata")
+            valid = False
     
-    word_count = len(topic.split())
-    if word_count > 100:
-        st.error(f"Topik melebihi 100 kata! ({word_count} kata)")
-        st.stop()
+    # Validasi STANDAR 1 (min 2 kata, max 25 kata)
+    if std1.strip():
+        word_count_std1 = len(std1.strip().split())
+        if word_count_std1 < 2:
+            st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {word_count_std1} kata")
+            valid = False
+        elif word_count_std1 > 25:
+            st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
+            valid = False
+    else:
+        st.error("❌ Standar 1 tidak boleh kosong!")
+        valid = False
     
-    # Simpan topic ke session
-    st.session_state.current_topic = topic
+    # Validasi STANDAR 2 (min 2 kata, max 25 kata)
+    if std2.strip():
+        word_count_std2 = len(std2.strip().split())
+        if word_count_std2 < 2:
+            st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {word_count_std2} kata")
+            valid = False
+        elif word_count_std2 > 25:
+            st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
+            valid = False
+    else:
+        st.error("❌ Standar 2 tidak boleh kosong!")
+        valid = False
     
-    with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
-        prompt = f"""
-        Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
+    # Validasi WAKTU
+    if not time_minutes.strip():
+        st.error("❌ Alokasi waktu tidak boleh kosong!")
+        valid = False
+    else:
+        if not time_minutes.isdigit():
+            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 120)")
+            valid = False
+        elif len(time_minutes) > 3:
+            st.error("❌ Alokasi waktu maksimal 3 digit! (contoh: 45 atau 120)")
+            valid = False
+        elif int(time_minutes) < 30:
+            st.error("❌ Alokasi waktu minimal 30 menit!")
+            valid = False
+    
+    if valid:
+        st.session_state.current_topic = topic
         
-        Topik: {topic}
-        Bahasa: {language}
-        Kelas: {grade}
-        Standar 1: {std1}
-        Standar 2: {std2}
-        Alokasi Waktu: {time_allotment}
-        
-        Integrasikan kearifan lokal Jawa Timur.
-        
-        Struktur:
-        1. KOMPETENSI AWAL
-        2. PROFIL PELAJAR PANCASILA
-        3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
-        4. PENILAIAN
-        
-        Gunakan format:
-        ## untuk judul utama
-        ### untuk sub judul
-        - untuk list
-        **teks** untuk penekanan
-        
-        Langsung ke konten, tanpa kata pengantar.
-        """
-        
-        result = call_gemini(prompt)
-        
-        if result:
-            st.session_state.generated_content = result
-            st.session_state.is_generated = True
-            st.success("✅ Lesson Plan berhasil dibuat!")
-        else:
-            st.error("Gagal menghasilkan. Silakan coba lagi.")
+        with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
+            prompt = f"""
+            Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
+            
+            Topik: {topic}
+            Bahasa: {language}
+            Kelas: {grade}
+            Standar 1: {std1}
+            Standar 2: {std2}
+            Alokasi Waktu: {time_minutes} Menit
+            
+            Integrasikan kearifan lokal Jawa Timur.
+            
+            Struktur:
+            1. KOMPETENSI AWAL
+            2. PROFIL PELAJAR PANCASILA
+            3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
+            4. PENILAIAN
+            
+            Gunakan format:
+            ## untuk judul utama
+            ### untuk sub judul
+            - untuk list
+            **teks** untuk penekanan
+            
+            Langsung ke konten, tanpa kata pengantar.
+            """
+            
+            result = call_gemini(prompt)
+            
+            if result:
+                st.session_state.generated_content = result
+                st.session_state.is_generated = True
+                st.success("✅ Lesson Plan berhasil dibuat!")
+            else:
+                st.error("Gagal menghasilkan. Silakan coba lagi.")
 
-# --- Tampilkan hasil jika ada ---
+
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
     
-    # Tombol download
     doc_file = create_word_document(
         st.session_state.generated_content, 
         st.session_state.current_topic[:50]
@@ -204,7 +263,6 @@ if st.session_state.is_generated and st.session_state.generated_content:
     
     st.divider()
     
-    # Preview
     st.subheader("📄 Preview")
     st.markdown(st.session_state.generated_content)
     
