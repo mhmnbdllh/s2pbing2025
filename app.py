@@ -65,6 +65,8 @@ def create_word_document(content, topic_name):
         line = line.strip()
         if not line:
             doc.add_paragraph()
+        elif line.startswith('#'):
+            doc.add_heading(line.replace('#', '').strip(), level=1)
         elif line.startswith('##'):
             doc.add_heading(line.replace('##', '').strip(), level=2)
         elif line.startswith('###'):
@@ -233,10 +235,12 @@ if submitted:
             4. PENILAIAN
             
             Gunakan format:
-            ## untuk judul utama
-            ### untuk sub judul
+            # untuk judul utama
+            ## untuk sub judul
+            ### untuk sub-sub judul
             - untuk list
-            **teks** untuk penekanan
+            **teks** untuk bold
+            *teks* untuk italic
             
             Langsung ke konten, tanpa kata pengantar.
             """
@@ -250,6 +254,7 @@ if submitted:
             else:
                 st.error("Gagal menghasilkan. Silakan coba lagi.")
 
+# --- Tampilkan hasil jika ada ---
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
     
