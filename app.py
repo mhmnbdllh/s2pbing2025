@@ -18,7 +18,7 @@ st.set_page_config(
 
 # --- Header ---
 st.title("📚 AI Lesson Plan Generator")
-st.caption("Powered by Google Gemini AI | Generate RPP berkualitas dengan muatan kearifan lokal Jawa Timur")
+st.caption("DESIGNED AND DEVELOPED BY S2PBING2025A | Generate RPP dengan muatan kearifan lokal Jawa Timur")
 
 # --- Ambil API Key dari Streamlit Secrets ---
 try:
@@ -165,7 +165,7 @@ def _add_word_table(doc, header_cells, data_rows):
             for run in p.runs:
                 run.font.size = Pt(10)
 
-    doc.add_paragraph()   # space after table
+    doc.add_paragraph()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -299,16 +299,15 @@ def create_word_document(content, topic_name):
 
 
 # ══════════════════════════════════════════════════════════════
-# Gemini caller — with automatic continuation if output is cut off
+# API Caller
 # ══════════════════════════════════════════════════════════════
 
 def call_gemini(prompt_text):
     model        = genai.GenerativeModel(MODEL_NAME)
     gen_config   = {"temperature": 0.4, "max_output_tokens": 8000}
-    MAX_CHUNKS   = 5          # safety cap — at most 5 continuation calls
+    MAX_CHUNKS   = 5
     full_content = ""
 
-    # Build a mutable conversation history for multi-turn continuation
     history = [{"role": "user", "parts": [prompt_text]}]
 
     for chunk_num in range(MAX_CHUNKS):
@@ -331,7 +330,6 @@ def call_gemini(prompt_text):
         if response is None:
             return None
 
-        # Extract text from this chunk
         chunk_text = response.text
         # Strip markdown code fences only on the very first chunk
         if chunk_num == 0:
@@ -340,18 +338,15 @@ def call_gemini(prompt_text):
 
         full_content += chunk_text
 
-        # Check finish reason — 'STOP' means model finished naturally
         finish_reason = None
         try:
             finish_reason = response.candidates[0].finish_reason.name
         except Exception:
             pass
 
-        # If the model finished on its own, we're done
         if finish_reason != "MAX_TOKENS":
             break
 
-        # Output was cut off — add assistant reply to history and ask to continue
         history.append({"role": "model",  "parts": [chunk_text]})
         history.append({"role": "user",   "parts": ["Lanjutkan tepat dari titik berhenti, tanpa pengulangan."]})
 
@@ -366,7 +361,7 @@ with st.form("lesson_form"):
     topic = st.text_area(
         "📖 **Topik Pembelajaran**",
         height=80,
-        placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
+        placeholder="Contoh: Memperkenalkan kebudayaan Jawa Timur kepada Turis Asing",
         help="Minimal 3 kata, maksimal 100 kata (MAX 500 KARAKTER)",
         max_chars=500
     )
@@ -436,7 +431,7 @@ if submitted:
         st.session_state.current_topic = topic
         with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
             prompt = f"""
-            Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
+            Buat Rencana Pelaksanaan Pembelajaran (RPP) yang lengkap, tanpa terpotong, dengan detail berikut:
 
             Topik: {topic}
             Bahasa: {language}
@@ -445,7 +440,7 @@ if submitted:
             Standar 2: {std2}
             Alokasi Waktu: {time_minutes} Menit
 
-            Integrasikan kearifan lokal Jawa Timur.
+            Integrasikan kearifan lokal Jawa Timur dalam instruksi/materi/aktivitas pembelajaran.
 
             Struktur:
             1. KOMPETENSI AWAL
@@ -453,14 +448,7 @@ if submitted:
             3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
             4. PENILAIAN
 
-            Gunakan format:
-            ## untuk judul utama
-            ### untuk sub judul
-            - untuk list
-            **teks** untuk penekanan
-            | tabel | jika diperlukan |
-
-            Langsung ke konten, tanpa kata pengantar.
+            Langsung ke konten, tanpa kata pengantar, tanpa kesimpulan. Jangan berdialog. Selesaikan RPP sesuai batas token, JANGAN memotong di tengah kalimat, heading, list, atau tabel.
             """
             result = call_gemini(prompt)
             if result:
@@ -493,4 +481,4 @@ if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
     st.subheader("📄 Preview")
     st.markdown(st.session_state.generated_content, unsafe_allow_html=True)
-    st.caption("💡 Download file Word untuk hasil cetak yang rapi.")
+    st.caption("💡 Download Output in Word File.")
