@@ -44,7 +44,7 @@ kelas_options = [
     "Kelas X SMA", "Kelas XI SMA", "Kelas XII SMA"
 ]
 
-# --- Fungsi membuat file Word ---
+# --- Fungsi membuat file Word (HANYA INI YANG DIPERBAIKI) ---
 def create_word_document(content, topic_name):
     doc = Document()
     
@@ -65,15 +65,26 @@ def create_word_document(content, topic_name):
         line = line.strip()
         if not line:
             doc.add_paragraph()
-        elif line.startswith('##'):
-            doc.add_heading(line.replace('##', '').strip(), level=2)
-        elif line.startswith('###'):
-            doc.add_heading(line.replace('###', '').strip(), level=3)
-        elif line.startswith('-') or line.startswith('*'):
+            continue
+        
+        # Heading level 2 (##)
+        if line.startswith('##'):
+            doc.add_heading(line.lstrip('#').strip(), level=2)
+            continue
+        
+        # Heading level 3 (###)
+        if line.startswith('###'):
+            doc.add_heading(line.lstrip('#').strip(), level=3)
+            continue
+        
+        # List bullet
+        if line.startswith('-') or line.startswith('*'):
             doc.add_paragraph(line[1:].strip(), style='List Bullet')
-        else:
-            clean_line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
-            doc.add_paragraph(clean_line)
+            continue
+        
+        # Paragraf biasa - hapus markdown bold
+        line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
+        doc.add_paragraph(line)
     
     from datetime import datetime
     footer = doc.sections[0].footer
@@ -89,7 +100,6 @@ def create_word_document(content, topic_name):
 
 # --- Fungsi panggil Gemini dengan System Instruction ---
 def call_gemini(prompt_text, language):
-    # SYSTEM INSTRUCTION TEKNIS UNTUK MEMAKSA BAHASA
     if language == "Indonesian":
         system_instruction = "Anda adalah asisten guru yang hanya merespon dalam Bahasa Indonesia. Anda tidak pernah menggunakan Bahasa Inggris sama sekali. Semua judul, deskripsi, dan konten harus dalam Bahasa Indonesia murni."
     else:
@@ -234,7 +244,6 @@ if submitted:
             Gunakan format ## untuk judul, ### untuk sub judul, - untuk list.
             Langsung ke konten.
             """
-            # --- END OF PROMPT ---
             
             result = call_gemini(prompt, language)
             
