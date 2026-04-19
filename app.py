@@ -299,27 +299,63 @@ def create_word_document(content, topic_name):
 
 
 # ══════════════════════════════════════════════════════════════
-# Gemini caller
+# Gemini caller — with automatic continuation if output is cut off
 # ══════════════════════════════════════════════════════════════
 
 def call_gemini(prompt_text):
-    model = genai.GenerativeModel(MODEL_NAME)
-    for attempt in range(3):
-        try:
-            response = model.generate_content(
-                prompt_text,
-                generation_config={"temperature": 0.7, "max_output_tokens": 6000}
-            )
-            content = response.text
-            content = re.sub(r'^```\w*\n?', '', content)
-            content = re.sub(r'\n?```$',    '', content)
-            return content.strip()
-        except Exception as e:
-            if attempt < 2 and ("503" in str(e) or "high demand" in str(e).lower()):
-                time.sleep(2)
-                continue
-            st.error(f"Error: {str(e)}")
+    model        = genai.GenerativeModel(MODEL_NAME)
+    gen_config   = {"temperature": 0.4, "max_output_tokens": 8000}
+    MAX_CHUNKS   = 5          # safety cap — at most 5 continuation calls
+    full_content = ""
+
+    # Build a mutable conversation history for multi-turn continuation
+    history = [{"role": "user", "parts": [prompt_text]}]
+
+    for chunk_num in range(MAX_CHUNKS):
+        # Retry loop for transient errors (503, high demand)
+        response = None
+        for attempt in range(3):
+            try:
+                response = model.generate_content(
+                    history,
+                    generation_config=gen_config
+                )
+                break
+            except Exception as e:
+                if attempt < 2 and ("503" in str(e) or "high demand" in str(e).lower()):
+                    time.sleep(2)
+                    continue
+                st.error(f"Error: {str(e)}")
+                return None
+
+        if response is None:
             return None
+
+        # Extract text from this chunk
+        chunk_text = response.text
+        # Strip markdown code fences only on the very first chunk
+        if chunk_num == 0:
+            chunk_text = re.sub(r'^```\w*\n?', '', chunk_text)
+        chunk_text = re.sub(r'\n?```$', '', chunk_text)
+
+        full_content += chunk_text
+
+        # Check finish reason — 'STOP' means model finished naturally
+        finish_reason = None
+        try:
+            finish_reason = response.candidates[0].finish_reason.name
+        except Exception:
+            pass
+
+        # If the model finished on its own, we're done
+        if finish_reason != "MAX_TOKENS":
+            break
+
+        # Output was cut off — add assistant reply to history and ask to continue
+        history.append({"role": "model",  "parts": [chunk_text]})
+        history.append({"role": "user",   "parts": ["Lanjutkan tepat dari titik berhenti, tanpa pengulangan."]})
+
+    return full_content.strip()
 
 
 # ══════════════════════════════════════════════════════════════
