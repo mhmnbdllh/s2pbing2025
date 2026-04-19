@@ -72,8 +72,15 @@ def create_word_document(content, topic_name):
         elif line.startswith('-') or line.startswith('*'):
             doc.add_paragraph(line[1:].strip(), style='List Bullet')
         else:
-            clean_line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
-            doc.add_paragraph(clean_line)
+            p = doc.add_paragraph()
+            parts = re.split(r'(\*\*.*?\*\*)', line)
+            
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    text_bold = part.replace('**', '')
+                    p.add_run(text_bold).bold = True
+                else:
+                    p.add_run(part)
     
     from datetime import datetime
     footer = doc.sections[0].footer
