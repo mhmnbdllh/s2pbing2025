@@ -65,7 +65,7 @@ def create_word_document(content, topic_name):
         line = line.strip()
         if not line:
             doc.add_paragraph()
-    
+
         # Heading level 1 (#)
         elif line.startswith('#'):
             para = doc.add_heading(level=1)
@@ -77,15 +77,15 @@ def create_word_document(content, topic_name):
                     run = para.add_run(part[1:-1]); run.italic = True
                 else:
                     para.add_run(part)
-    
+
         # Heading level 2 (##)
         elif line.startswith('##'):
             doc.add_heading(line.replace('##', '').strip(), level=2)
-    
+
         # Heading level 3 (###)
         elif line.startswith('###'):
             doc.add_heading(line.replace('###', '').strip(), level=3)
-    
+
         # Bullet list
         elif line.startswith('-') or line.startswith('*'):
             para = doc.add_paragraph(style='List Bullet')
@@ -96,8 +96,8 @@ def create_word_document(content, topic_name):
                 elif part.startswith('*') and part.endswith('*'):
                     run = para.add_run(part[1:-1]); run.italic = True
                 else:
-                    run = para.add_run(part)
-    
+                    para.add_run(part)
+
         # Tabel Markdown
         elif '|' in line:
             cells = [c.strip() for c in line.split('|') if c.strip()]
@@ -105,13 +105,30 @@ def create_word_document(content, topic_name):
                 doc.current_table = doc.add_table(rows=1, cols=len(cells))
                 hdr_cells = doc.current_table.rows[0].cells
                 for i, cell in enumerate(cells):
-                    hdr_cells[i].text = cell
+                    para = hdr_cells[i].paragraphs[0]
+                    parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', cell)
+                    for part in parts:
+                        if part.startswith('**') and part.endswith('**'):
+                            run = para.add_run(part[2:-2]); run.bold = True
+                        elif part.startswith('*') and part.endswith('*'):
+                            run = para.add_run(part[1:-1]); run.italic = True
+                        else:
+                            para.add_run(part)
             else:
                 row_cells = doc.current_table.add_row().cells
                 for i, cell in enumerate(cells):
-                    row_cells[i].text = cell
+                    para = row_cells[i].paragraphs[0]
+                    parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', cell)
+                    for part in parts:
+                        if part.startswith('**') and part.endswith('**'):
+                            run = para.add_run(part[2:-2]); run.bold = True
+                        elif part.startswith('*') and part.endswith('*'):
+                            run = para.add_run(part[1:-1]); run.italic = True
+                        else:
+                            para.add_run(part)
+
+        # Paragraf biasa
         else:
-            # Paragraf biasa dengan bold/italic
             para = doc.add_paragraph()
             parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line)
             for part in parts:
@@ -133,188 +150,3 @@ def create_word_document(content, topic_name):
     doc.save(doc_bytes)
     doc_bytes.seek(0)
     return doc_bytes
-
-# --- Fungsi panggil Gemini ---
-def call_gemini(prompt_text):
-    model = genai.GenerativeModel(MODEL_NAME)
-    
-    for attempt in range(3):
-        try:
-            response = model.generate_content(
-                prompt_text,
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 6000,
-                }
-            )
-            content = response.text
-            content = re.sub(r'^```\w*\n?', '', content)
-            content = re.sub(r'\n?```$', '', content)
-            return content.strip()
-        except Exception as e:
-            if attempt < 2 and ("503" in str(e) or "high demand" in str(e).lower()):
-                time.sleep(2)
-                continue
-            st.error(f"Error: {str(e)}")
-            return None
-
-# --- Form Input ---
-with st.form("lesson_form"):
-    topic = st.text_area(
-        "📖 **Topik Pembelajaran**",
-        height=80,
-        placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
-        help="Minimal 3 kata, maksimal 100 kata (MAX 500 KARAKTER)",
-        max_chars=500  # MEMBATASI FISIK INPUT
-    )
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        language = st.selectbox("🌐 Bahasa", ["Indonesian", "English"], index=0)
-        grade = st.selectbox("🎓 Kelas", kelas_options, index=4)
-    with col2:
-        std1 = st.text_area(
-            "🎯 Standar 1 (Capaian Pembelajaran)", 
-            height=60,
-            help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125  # 25 kata × 5 huruf
-        )
-        std2 = st.text_area(
-            "📝 Standar 2 (Tujuan Pembelajaran)", 
-            height=60,
-            help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125  # 25 kata × 5 huruf
-        )
-    
-    time_minutes = st.text_input(
-        "⏰ Alokasi Waktu (Menit)",
-        placeholder="Contoh: 70",
-        help="Hanya angka, maksimal 3 digit (contoh: 70, 90, 120)",
-        max_chars=3  # MAKSIMAL 3 DIGIT
-    )
-    
-    submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
-
-# --- Validasi dan Proses Generate ---
-if submitted:
-    valid = True
-    
-    # Validasi TOPIK (min 3 kata, max 100 kata)
-    if not topic.strip():
-        st.error("❌ Topik tidak boleh kosong!")
-        valid = False
-    else:
-        word_count_topic = len(topic.strip().split())
-        if word_count_topic < 3:
-            st.error(f"❌ Topik minimal 3 kata! Saat ini: {word_count_topic} kata")
-            valid = False
-        elif word_count_topic > 100:
-            st.error(f"❌ Topik maksimal 100 kata! Saat ini: {word_count_topic} kata")
-            valid = False
-    
-    # Validasi STANDAR 1 (min 2 kata, max 25 kata)
-    if not std1.strip():
-        st.error("❌ Standar 1 tidak boleh kosong!")
-        valid = False
-    else:
-        word_count_std1 = len(std1.strip().split())
-        if word_count_std1 < 2:
-            st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {word_count_std1} kata")
-            valid = False
-        elif word_count_std1 > 25:
-            st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
-            valid = False
-    
-    # Validasi STANDAR 2 (min 2 kata, max 25 kata)
-    if not std2.strip():
-        st.error("❌ Standar 2 tidak boleh kosong!")
-        valid = False
-    else:
-        word_count_std2 = len(std2.strip().split())
-        if word_count_std2 < 2:
-            st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {word_count_std2} kata")
-            valid = False
-        elif word_count_std2 > 25:
-            st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
-            valid = False
-    
-    # Validasi WAKTU (hanya angka, max 3 digit)
-    if not time_minutes.strip():
-        st.error("❌ Alokasi waktu tidak boleh kosong!")
-        valid = False
-    else:
-        if not time_minutes.isdigit():
-            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 70)")
-            valid = False
-        elif len(time_minutes) > 3:
-            st.error("❌ Alokasi waktu maksimal 3 digit! (contoh: 70 atau 120, maksimal 999)")
-            valid = False
-        elif int(time_minutes) < 10:
-            st.error("❌ Alokasi waktu minimal 10 menit!")
-            valid = False
-    
-    if valid:
-        st.session_state.current_topic = topic
-        
-        with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
-            prompt = f"""
-            Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
-            
-            Topik: {topic}
-            Bahasa: {language}
-            Kelas: {grade}
-            Standar 1: {std1}
-            Standar 2: {std2}
-            Alokasi Waktu: {time_minutes} Menit
-            
-            Integrasikan kearifan lokal Jawa Timur.
-            
-            Struktur:
-            1. KOMPETENSI AWAL
-            2. PROFIL PELAJAR PANCASILA
-            3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
-            4. PENILAIAN
-            
-            Gunakan format:
-            ## untuk judul utama
-            ### untuk sub judul
-            - untuk list
-            **teks** untuk penekanan
-            
-            Langsung ke konten, tanpa kata pengantar.
-            """
-            
-            result = call_gemini(prompt)
-            
-            if result:
-                st.session_state.generated_content = result
-                st.session_state.is_generated = True
-                st.success("✅ Lesson Plan berhasil dibuat!")
-            else:
-                st.error("Gagal menghasilkan. Silakan coba lagi.")
-
-# --- Tampilkan hasil jika ada ---
-if st.session_state.is_generated and st.session_state.generated_content:
-    st.divider()
-    
-    doc_file = create_word_document(
-        st.session_state.generated_content, 
-        st.session_state.current_topic[:50]
-    )
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.download_button(
-            label="📥 Download Lesson Plan (Word)",
-            data=doc_file,
-            file_name=f"Lesson_Plan_{int(time.time())}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
-        )
-    
-    st.divider()
-    
-    st.subheader("📄 Preview")
-    st.markdown(st.session_state.generated_content, unsafe_allow_html=True)
-    
-    st.caption("💡 Download file Word untuk hasil cetak yang rapi.")
