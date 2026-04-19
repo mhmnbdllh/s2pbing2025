@@ -31,7 +31,7 @@ except:
 MODEL_NAME = "gemini-2.5-flash"
 genai.configure(api_key=gemini_api_key)
 
-# --- Session State untuk menyimpan hasil ---
+# --- Session State ---
 if 'generated_content' not in st.session_state:
     st.session_state.generated_content = None
 if 'is_generated' not in st.session_state:
@@ -46,138 +46,243 @@ kelas_options = [
     "Kelas X SMA", "Kelas XI SMA", "Kelas XII SMA"
 ]
 
-# ─────────────────────────────────────────────
-# HELPER: add formatted runs (bold / italic) to a paragraph
-# ─────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════
+# HELPERS
+# ══════════════════════════════════════════════════════════════
+
 def _add_inline_runs(paragraph, text):
-    """
-    Parse inline markdown (** bold **, * italic *, *** bold-italic ***)
-    and add properly formatted runs to `paragraph`.
-    """
-    # Pattern captures: ***text***, **text**, *text*, plain text
-    pattern = r'(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*)'
-    parts = re.split(pattern, text)
+    """Parse ***bold-italic***, **bold**, *italic* and add proper Word runs."""
+    pattern = r'(\*{3}.+?\*{3}|\*{2}.+?\*{2}|\*.+?\*)'
+    parts = re.split(pattern, text, flags=re.DOTALL)
     for part in parts:
         if not part:
             continue
         if part.startswith('***') and part.endswith('***'):
-            run = paragraph.add_run(part[3:-3])
-            run.bold = True
-            run.italic = True
+            r = paragraph.add_run(part[3:-3])
+            r.bold = True
+            r.italic = True
         elif part.startswith('**') and part.endswith('**'):
-            run = paragraph.add_run(part[2:-2])
-            run.bold = True
+            r = paragraph.add_run(part[2:-2])
+            r.bold = True
         elif part.startswith('*') and part.endswith('*') and len(part) > 2:
-            run = paragraph.add_run(part[1:-1])
-            run.italic = True
+            r = paragraph.add_run(part[1:-1])
+            r.italic = True
         else:
             paragraph.add_run(part)
 
 
-# ─────────────────────────────────────────────
-# HELPER: strip ALL markdown from a heading line before using it
-# ─────────────────────────────────────────────
 def _strip_markdown(text):
-    """Remove bold/italic markers and leading list chars from text."""
+    """Remove bold/italic markers for headings and table headers."""
     text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
     text = re.sub(r'_{1,3}(.*?)_{1,3}', r'\1', text)
     return text.strip()
 
 
-# ─────────────────────────────────────────────
-# MAIN: create_word_document  (fully rewritten)
-# ─────────────────────────────────────────────
+def _is_table_row(line):
+    """True if line looks like  | cell | cell |"""
+    s = line.strip()
+    return s.startswith('|') and s.endswith('|') and len(s) > 2
+
+
+def _is_separator_row(line):
+    """True for alignment rows like  |---|:---:|:---|"""
+    s = line.strip()
+    if not _is_table_row(s):
+        return False
+    inner = s[1:-1]
+    return all(re.match(r'^[\s\-:]+$', c) for c in inner.split('|'))
+
+
+def _parse_table_cells(line):
+    """Return list of cell text strings from one markdown table row."""
+    s = line.strip().strip('|')
+    return [c.strip() for c in s.split('|')]
+
+
+def _set_cell_border(cell):
+    """Apply thin grey border to every edge of a table cell."""
+    tc   = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    tcBorders = OxmlElement('w:tcBorders')
+    for edge in ('top', 'left', 'bottom', 'right'):
+        b = OxmlElement(f'w:{edge}')
+        b.set(qn('w:val'),   'single')
+        b.set(qn('w:sz'),    '4')        # ½ pt
+        b.set(qn('w:space'), '0')
+        b.set(qn('w:color'), 'AAAAAA')
+        tcBorders.append(b)
+    tcPr.append(tcBorders)
+
+
+def _shade_cell(cell, fill_hex):
+    """Set cell background colour."""
+    tc   = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    shd  = OxmlElement('w:shd')
+    shd.set(qn('w:val'),   'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'),  fill_hex)
+    tcPr.append(shd)
+
+
+def _add_word_table(doc, header_cells, data_rows):
+    """
+    Render a proper Word table from parsed markdown table data.
+    header_cells : list[str]        — column headers
+    data_rows    : list[list[str]]  — body rows
+    """
+    n_cols = max(len(header_cells), max((len(r) for r in data_rows), default=1))
+    n_rows = 1 + len(data_rows)
+
+    table = doc.add_table(rows=n_rows, cols=n_cols)
+    table.style = 'Table Grid'
+
+    # Header row — blue background, bold text
+    for col_i, cell_text in enumerate(header_cells):
+        cell = table.rows[0].cells[col_i]
+        _set_cell_border(cell)
+        _shade_cell(cell, 'D9E1F2')
+        p = cell.paragraphs[0]
+        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_after  = Pt(2)
+        run = p.add_run(_strip_markdown(cell_text))
+        run.bold = True
+        run.font.size = Pt(10)
+
+    # Data rows — alternating white / light grey (zebra)
+    for row_i, row_cells in enumerate(data_rows):
+        fill = 'F2F2F2' if row_i % 2 == 0 else 'FFFFFF'
+        for col_i in range(n_cols):
+            cell_text = row_cells[col_i] if col_i < len(row_cells) else ''
+            cell = table.rows[row_i + 1].cells[col_i]
+            _set_cell_border(cell)
+            _shade_cell(cell, fill)
+            p = cell.paragraphs[0]
+            p.paragraph_format.space_before = Pt(2)
+            p.paragraph_format.space_after  = Pt(2)
+            _add_inline_runs(p, cell_text)
+            for run in p.runs:
+                run.font.size = Pt(10)
+
+    doc.add_paragraph()   # space after table
+
+
+# ══════════════════════════════════════════════════════════════
+# MAIN: create_word_document
+# ══════════════════════════════════════════════════════════════
+
 def create_word_document(content, topic_name):
     doc = Document()
 
-    # Page margins
     for section in doc.sections:
         section.top_margin    = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin   = Inches(1)
         section.right_margin  = Inches(1)
 
-    # ── Document title ──────────────────────────────────────────────
+    # Title
     title_para = doc.add_heading('RENCANA PELAKSANAAN PEMBELAJARAN (RPP)', level=1)
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = sub.add_run(f"Topik: {topic_name}")
-    run.bold = True
+    r = sub.add_run(f"Topik: {topic_name}")
+    r.bold = True
 
     doc.add_paragraph('─' * 60)
 
-    # ── Line-by-line markdown parser ────────────────────────────────
-    lines = content.split('\n')
+    # ── Group lines into ('line', text) or ('table', [lines]) segments ──
+    lines    = content.split('\n')
+    segments = []
     i = 0
     while i < len(lines):
-        raw = lines[i]
-        stripped = raw.strip()
-        i += 1
+        if _is_table_row(lines[i]):
+            block = []
+            while i < len(lines) and _is_table_row(lines[i]):
+                block.append(lines[i])
+                i += 1
+            segments.append(('table', block))
+        else:
+            segments.append(('line', lines[i]))
+            i += 1
 
-        # Skip empty lines → blank paragraph for spacing
+    # ── Render each segment ─────────────────────────────────────────────
+    for seg_type, seg_data in segments:
+
+        # ── TABLE ──────────────────────────────────────────────────────
+        if seg_type == 'table':
+            header_cells = None
+            data_rows    = []
+            for tl in seg_data:
+                if _is_separator_row(tl):
+                    continue                    # skip |---|---| separator
+                cells = _parse_table_cells(tl)
+                if header_cells is None:
+                    header_cells = cells        # first content row = header
+                else:
+                    data_rows.append(cells)
+            if header_cells:
+                _add_word_table(doc, header_cells, data_rows)
+            continue
+
+        # ── NORMAL LINE ─────────────────────────────────────────────────
+        raw      = seg_data
+        stripped = raw.strip()
+
+        # Empty line
         if not stripped:
             doc.add_paragraph()
             continue
 
-        # ── Headings: #, ##, ###, #### ──────────────────────────────
-        heading_match = re.match(r'^(#{1,4})\s+(.*)', stripped)
-        if heading_match:
-            hashes  = heading_match.group(1)
-            h_text  = _strip_markdown(heading_match.group(2))
-            h_level = min(len(hashes), 4)          # cap at level 4
-            doc.add_heading(h_text, level=h_level)
+        # Heading  # / ## / ### / ####
+        m = re.match(r'^(#{1,4})\s+(.*)', stripped)
+        if m:
+            doc.add_heading(_strip_markdown(m.group(2)), level=min(len(m.group(1)), 4))
             continue
 
-        # ── Numbered list: 1. item, 2. item … ───────────────────────
-        num_match = re.match(r'^(\d+)[.)]\s+(.*)', stripped)
-        if num_match:
-            item_text = num_match.group(2)
+        # Numbered list  1. or 1)
+        m = re.match(r'^(\d+)[.)]\s+(.*)', stripped)
+        if m:
             para = doc.add_paragraph(style='List Number')
-            _add_inline_runs(para, item_text)
+            _add_inline_runs(para, m.group(2))
             continue
 
-        # ── Bullet list: -, *, + ─────────────────────────────────────
-        bullet_match = re.match(r'^[-*+]\s+(.*)', stripped)
-        if bullet_match:
-            item_text = bullet_match.group(1)
-
-            # Check if it looks like a sub-bullet (indented in original)
-            indent_len = len(raw) - len(raw.lstrip())
-            style = 'List Bullet 2' if indent_len >= 4 else 'List Bullet'
-
-            para = doc.add_paragraph(style=style)
-            _add_inline_runs(para, item_text)
-            continue
-
-        # ── Indented bullet (spaces before - or *) ───────────────────
-        indented_match = re.match(r'^(\s{2,})[-*+]\s+(.*)', raw)
-        if indented_match:
-            item_text = indented_match.group(2)
+        # Indented bullet (2+ leading spaces before - * +)
+        m = re.match(r'^\s{2,}[-*+]\s+(.*)', raw)
+        if m:
             para = doc.add_paragraph(style='List Bullet 2')
-            _add_inline_runs(para, item_text)
+            _add_inline_runs(para, m.group(1))
             continue
 
-        # ── Horizontal rule: ---, ***, ___ ──────────────────────────
+        # Bullet  - / * / +
+        m = re.match(r'^[-*+]\s+(.*)', stripped)
+        if m:
+            indent = len(raw) - len(raw.lstrip())
+            style  = 'List Bullet 2' if indent >= 4 else 'List Bullet'
+            para   = doc.add_paragraph(style=style)
+            _add_inline_runs(para, m.group(1))
+            continue
+
+        # Horizontal rule  --- / *** / ___
         if re.match(r'^[-*_]{3,}$', stripped):
             doc.add_paragraph('─' * 60)
             continue
 
-        # ── Bold-only line (acts like a sub-heading) ─────────────────
-        if re.match(r'^\*\*.*\*\*$', stripped) and stripped.count('**') == 2:
-            clean = stripped[2:-2]
-            para  = doc.add_paragraph()
-            run   = para.add_run(clean)
-            run.bold = True
-            run.font.size = Pt(12)
+        # Standalone bold line  **text**  → sub-heading style
+        if stripped.startswith('**') and stripped.endswith('**') \
+                and stripped.count('**') == 2 and len(stripped) > 4:
+            para = doc.add_paragraph()
+            r    = para.add_run(_strip_markdown(stripped))
+            r.bold = True
+            r.font.size = Pt(12)
             continue
 
-        # ── Plain paragraph (may contain inline markdown) ────────────
+        # Plain paragraph (with inline bold/italic)
         para = doc.add_paragraph()
         _add_inline_runs(para, stripped)
 
-    # ── Footer ──────────────────────────────────────────────────────
+    # Footer
     from datetime import datetime
     footer      = doc.sections[0].footer
     footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
@@ -187,28 +292,27 @@ def create_word_document(content, topic_name):
         f"Generated by AI Lesson Plan Generator | {datetime.now().strftime('%d/%m/%Y %H:%M')}"
     )
 
-    doc_bytes = BytesIO()
-    doc.save(doc_bytes)
-    doc_bytes.seek(0)
-    return doc_bytes
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
 
 
-# --- Fungsi panggil Gemini ---
+# ══════════════════════════════════════════════════════════════
+# Gemini caller
+# ══════════════════════════════════════════════════════════════
+
 def call_gemini(prompt_text):
     model = genai.GenerativeModel(MODEL_NAME)
-
     for attempt in range(3):
         try:
             response = model.generate_content(
                 prompt_text,
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 6000,
-                }
+                generation_config={"temperature": 0.7, "max_output_tokens": 6000}
             )
             content = response.text
             content = re.sub(r'^```\w*\n?', '', content)
-            content = re.sub(r'\n?```$', '', content)
+            content = re.sub(r'\n?```$',    '', content)
             return content.strip()
         except Exception as e:
             if attempt < 2 and ("503" in str(e) or "high demand" in str(e).lower()):
@@ -218,7 +322,10 @@ def call_gemini(prompt_text):
             return None
 
 
-# --- Form Input ---
+# ══════════════════════════════════════════════════════════════
+# UI — Form
+# ══════════════════════════════════════════════════════════════
+
 with st.form("lesson_form"):
     topic = st.text_area(
         "📖 **Topik Pembelajaran**",
@@ -256,63 +363,41 @@ with st.form("lesson_form"):
     submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
 
 
-# --- Validasi dan Proses Generate ---
+# ── Validation & generation ─────────────────────────────────
 if submitted:
     valid = True
 
     if not topic.strip():
-        st.error("❌ Topik tidak boleh kosong!")
-        valid = False
+        st.error("❌ Topik tidak boleh kosong!"); valid = False
     else:
         wc = len(topic.strip().split())
-        if wc < 3:
-            st.error(f"❌ Topik minimal 3 kata! Saat ini: {wc} kata")
-            valid = False
-        elif wc > 100:
-            st.error(f"❌ Topik maksimal 100 kata! Saat ini: {wc} kata")
-            valid = False
+        if   wc < 3:   st.error(f"❌ Topik minimal 3 kata! Saat ini: {wc} kata");   valid = False
+        elif wc > 100: st.error(f"❌ Topik maksimal 100 kata! Saat ini: {wc} kata"); valid = False
 
     if not std1.strip():
-        st.error("❌ Standar 1 tidak boleh kosong!")
-        valid = False
+        st.error("❌ Standar 1 tidak boleh kosong!"); valid = False
     else:
         wc = len(std1.strip().split())
-        if wc < 2:
-            st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {wc} kata")
-            valid = False
-        elif wc > 25:
-            st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {wc} kata")
-            valid = False
+        if   wc < 2:  st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {wc} kata");   valid = False
+        elif wc > 25: st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {wc} kata"); valid = False
 
     if not std2.strip():
-        st.error("❌ Standar 2 tidak boleh kosong!")
-        valid = False
+        st.error("❌ Standar 2 tidak boleh kosong!"); valid = False
     else:
         wc = len(std2.strip().split())
-        if wc < 2:
-            st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {wc} kata")
-            valid = False
-        elif wc > 25:
-            st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {wc} kata")
-            valid = False
+        if   wc < 2:  st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {wc} kata");   valid = False
+        elif wc > 25: st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {wc} kata"); valid = False
 
     if not time_minutes.strip():
-        st.error("❌ Alokasi waktu tidak boleh kosong!")
-        valid = False
+        st.error("❌ Alokasi waktu tidak boleh kosong!"); valid = False
     else:
         if not time_minutes.isdigit():
-            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 70)")
-            valid = False
-        elif len(time_minutes) > 3:
-            st.error("❌ Alokasi waktu maksimal 3 digit!")
-            valid = False
+            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 70)"); valid = False
         elif int(time_minutes) < 10:
-            st.error("❌ Alokasi waktu minimal 10 menit!")
-            valid = False
+            st.error("❌ Alokasi waktu minimal 10 menit!"); valid = False
 
     if valid:
         st.session_state.current_topic = topic
-
         with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
             prompt = f"""
             Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
@@ -337,12 +422,11 @@ if submitted:
             ### untuk sub judul
             - untuk list
             **teks** untuk penekanan
+            | tabel | jika diperlukan |
 
             Langsung ke konten, tanpa kata pengantar.
             """
-
             result = call_gemini(prompt)
-
             if result:
                 st.session_state.generated_content = result
                 st.session_state.is_generated      = True
@@ -351,7 +435,7 @@ if submitted:
                 st.error("Gagal menghasilkan. Silakan coba lagi.")
 
 
-# --- Tampilkan hasil jika ada ---
+# ── Output ───────────────────────────────────────────────────
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
 
@@ -371,8 +455,6 @@ if st.session_state.is_generated and st.session_state.generated_content:
         )
 
     st.divider()
-
     st.subheader("📄 Preview")
     st.markdown(st.session_state.generated_content, unsafe_allow_html=True)
-
     st.caption("💡 Download file Word untuk hasil cetak yang rapi.")
