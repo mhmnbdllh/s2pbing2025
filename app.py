@@ -69,9 +69,11 @@ def create_word_document(content, topic_name):
             para = doc.add_heading(level=1)
             for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip()):
                 if part.startswith('**') and part.endswith('**'):
-                    run = para.add_run(part[2:-2]); run.bold = True
+                    run = para.add_run(part[2:-2])
+                    run.bold = True
                 elif part.startswith('*') and part.endswith('*'):
-                    run = para.add_run(part[1:-1]); run.italic = True
+                    run = para.add_run(part[1:-1])
+                    run.italic = True
                 else:
                     para.add_run(part)
         elif line.startswith('##'):
@@ -82,9 +84,11 @@ def create_word_document(content, topic_name):
             para = doc.add_paragraph(style='List Bullet')
             for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip()):
                 if part.startswith('**') and part.endswith('**'):
-                    run = para.add_run(part[2:-2]); run.bold = True
+                    run = para.add_run(part[2:-2])
+                    run.bold = True
                 elif part.startswith('*') and part.endswith('*'):
-                    run = para.add_run(part[1:-1]); run.italic = True
+                    run = para.add_run(part[1:-1])
+                    run.italic = True
                 else:
                     para.add_run(part)
         elif '|' in line:
@@ -96,9 +100,11 @@ def create_word_document(content, topic_name):
                     para = hdr_cells[i].paragraphs[0]
                     for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', cell):
                         if part.startswith('**') and part.endswith('**'):
-                            run = para.add_run(part[2:-2]); run.bold = True
+                            run = para.add_run(part[2:-2])
+                            run.bold = True
                         elif part.startswith('*') and part.endswith('*'):
-                            run = para.add_run(part[1:-1]); run.italic = True
+                            run = para.add_run(part[1:-1])
+                            run.italic = True
                         else:
                             para.add_run(part)
             else:
@@ -107,18 +113,22 @@ def create_word_document(content, topic_name):
                     para = row_cells[i].paragraphs[0]
                     for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', cell):
                         if part.startswith('**') and part.endswith('**'):
-                            run = para.add_run(part[2:-2]); run.bold = True
+                            run = para.add_run(part[2:-2])
+                            run.bold = True
                         elif part.startswith('*') and part.endswith('*'):
-                            run = para.add_run(part[1:-1]); run.italic = True
+                            run = para.add_run(part[1:-1])
+                            run.italic = True
                         else:
                             para.add_run(part)
         else:
             para = doc.add_paragraph()
             for part in re.split(r'(\*\*.*?\*\*|\*.*?\*)', line):
                 if part.startswith('**') and part.endswith('**'):
-                    run = para.add_run(part[2:-2]); run.bold = True
+                    run = para.add_run(part[2:-2])
+                    run.bold = True
                 elif part.startswith('*') and part.endswith('*'):
-                    run = para.add_run(part[1:-1]); run.italic = True
+                    run = para.add_run(part[1:-1])
+                    run.italic = True
                 else:
                     para.add_run(part)
     
@@ -207,7 +217,7 @@ if submitted:
         if word_count_topic < 3:
             st.error(f"❌ Topik minimal 3 kata! Saat ini: {word_count_topic} kata")
             valid = False
-                elif word_count_topic > 100:
+        elif word_count_topic > 100:
             st.error(f"❌ Topik maksimal 100 kata! Saat ini: {word_count_topic} kata")
             valid = False
     
