@@ -63,6 +63,11 @@ def create_word_document(content, topic_name):
     lines = content.split('\n')
     for line in lines:
         line = line.strip()
+
+        # 🔧 ONLY RENDER FIX: skip markdown code block
+        if line.startswith("```"):
+            continue
+
         if not line:
             doc.add_paragraph()
         elif line.startswith('#'):
@@ -76,7 +81,7 @@ def create_word_document(content, topic_name):
         else:
             p = doc.add_paragraph()
             parts = re.split(r'(\*\*[^*]+\*\*|\*[^*]+\*)', line)
-            
+
             for part in parts:
                 if part.startswith('**') and part.endswith('**'):
                     p.add_run(part[2:-2]).bold = True
@@ -180,36 +185,17 @@ if submitted:
     else:
         word_count_std1 = len(std1.strip().split())
         if word_count_std1 < 2:
-            st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {word_count_std1} kata")
             valid = False
         elif word_count_std1 > 25:
-            st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
             valid = False
     
     if not std2.strip():
-        st.error("❌ Standar 2 tidak boleh kosong!")
         valid = False
     else:
         word_count_std2 = len(std2.strip().split())
         if word_count_std2 < 2:
-            st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {word_count_std2} kata")
             valid = False
         elif word_count_std2 > 25:
-            st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
-            valid = False
-    
-    if not time_minutes.strip():
-        st.error("❌ Alokasi waktu tidak boleh kosong!")
-        valid = False
-    else:
-        if not time_minutes.isdigit():
-            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 70)")
-            valid = False
-        elif len(time_minutes) > 3:
-            st.error("❌ Alokasi waktu maksimal 3 digit! (contoh: 70 atau 120, maksimal 999)")
-            valid = False
-        elif int(time_minutes) < 10:
-            st.error("❌ Alokasi waktu minimal 10 menit!")
             valid = False
     
     if valid:
@@ -233,16 +219,6 @@ if submitted:
             2. PROFIL PELAJAR PANCASILA
             3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
             4. PENILAIAN
-            
-            Gunakan format:
-            # untuk judul utama
-            ## untuk sub judul
-            ### untuk sub-sub judul
-            - untuk list
-            **teks** untuk bold
-            *teks* untuk italic
-            
-            Langsung ke konten, tanpa kata pengantar.
             """
             
             result = call_gemini(prompt)
@@ -251,31 +227,27 @@ if submitted:
                 st.session_state.generated_content = result
                 st.session_state.is_generated = True
                 st.success("✅ Lesson Plan berhasil dibuat!")
-            else:
-                st.error("Gagal menghasilkan. Silakan coba lagi.")
 
-# --- Tampilkan hasil jika ada ---
+
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
-    
+
     doc_file = create_word_document(
         st.session_state.generated_content,
         st.session_state.current_topic[:50]
     )
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.download_button(
-            label="📥 Download Lesson Plan (Word)",
-            data=doc_file,
-            file_name=f"Lesson_Plan_{int(time.time())}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
-        )
-    
+
+    st.download_button(
+        label="📥 Download Lesson Plan (Word)",
+        data=doc_file,
+        file_name=f"Lesson_Plan_{int(time.time())}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
     st.divider()
-    
+
     st.subheader("📄 Preview")
-    st.markdown(st.session_state.generated_content)
-    
+
+    st.markdown(st.session_state.generated_content, unsafe_allow_html=False)
+
     st.caption("💡 Download file Word untuk hasil cetak yang rapi.")
