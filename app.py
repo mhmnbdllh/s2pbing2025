@@ -63,32 +63,26 @@ def create_word_document(content, topic_name):
     lines = content.split('\n')
     for line in lines:
         line = line.strip()
-
-        # 🔧 ONLY RENDER FIX: skip markdown code block
-        if line.startswith("```"):
-            continue
-
         if not line:
             doc.add_paragraph()
-        elif line.startswith('#'):
-            doc.add_heading(line.replace('#', '').strip(), level=1)
-        elif line.startswith('##'):
-            doc.add_heading(line.replace('##', '').strip(), level=2)
         elif line.startswith('###'):
             doc.add_heading(line.replace('###', '').strip(), level=3)
+        elif line.startswith('##'):
+            doc.add_heading(line.replace('##', '').strip(), level=2)
         elif line.startswith('-') or line.startswith('*'):
             doc.add_paragraph(line[1:].strip(), style='List Bullet')
         else:
-            p = doc.add_paragraph()
-            parts = re.split(r'(\*\*[^*]+\*\*|\*[^*]+\*)', line)
-
+            para = doc.add_paragraph()
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line)
             for part in parts:
                 if part.startswith('**') and part.endswith('**'):
-                    p.add_run(part[2:-2]).bold = True
+                    run = para.add_run(part[2:-2])
+                    run.bold = True
                 elif part.startswith('*') and part.endswith('*'):
-                    p.add_run(part[1:-1]).italic = True
+                    run = para.add_run(part[1:-1])
+                    run.italic = True
                 else:
-                    p.add_run(part)
+                    para.add_run(part)
     
     from datetime import datetime
     footer = doc.sections[0].footer
@@ -133,7 +127,7 @@ with st.form("lesson_form"):
         height=80,
         placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
         help="Minimal 3 kata, maksimal 100 kata (MAX 500 KARAKTER)",
-        max_chars=500
+        max_chars=500  # MEMBATASI FISIK INPUT
     )
     
     col1, col2 = st.columns(2)
@@ -142,23 +136,23 @@ with st.form("lesson_form"):
         grade = st.selectbox("🎓 Kelas", kelas_options, index=4)
     with col2:
         std1 = st.text_area(
-            "🎯 Standar 1 (Capaian Pembelajaran)",
+            "🎯 Standar 1 (Capaian Pembelajaran)", 
             height=60,
             help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125
+            max_chars=125  # 25 kata × 5 huruf
         )
         std2 = st.text_area(
-            "📝 Standar 2 (Tujuan Pembelajaran)",
+            "📝 Standar 2 (Tujuan Pembelajaran)", 
             height=60,
             help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125
+            max_chars=125  # 25 kata × 5 huruf
         )
     
     time_minutes = st.text_input(
         "⏰ Alokasi Waktu (Menit)",
         placeholder="Contoh: 70",
         help="Hanya angka, maksimal 3 digit (contoh: 70, 90, 120)",
-        max_chars=3
+        max_chars=3  # MAKSIMAL 3 DIGIT
     )
     
     submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
@@ -167,6 +161,7 @@ with st.form("lesson_form"):
 if submitted:
     valid = True
     
+    # Validasi TOPIK (min 3 kata, max 100 kata)
     if not topic.strip():
         st.error("❌ Topik tidak boleh kosong!")
         valid = False
@@ -179,23 +174,45 @@ if submitted:
             st.error(f"❌ Topik maksimal 100 kata! Saat ini: {word_count_topic} kata")
             valid = False
     
+    # Validasi STANDAR 1 (min 2 kata, max 25 kata)
     if not std1.strip():
         st.error("❌ Standar 1 tidak boleh kosong!")
         valid = False
     else:
         word_count_std1 = len(std1.strip().split())
         if word_count_std1 < 2:
+            st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {word_count_std1} kata")
             valid = False
         elif word_count_std1 > 25:
+            st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
             valid = False
     
+    # Validasi STANDAR 2 (min 2 kata, max 25 kata)
     if not std2.strip():
+        st.error("❌ Standar 2 tidak boleh kosong!")
         valid = False
     else:
         word_count_std2 = len(std2.strip().split())
         if word_count_std2 < 2:
+            st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {word_count_std2} kata")
             valid = False
         elif word_count_std2 > 25:
+            st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
+            valid = False
+    
+    # Validasi WAKTU (hanya angka, max 3 digit)
+    if not time_minutes.strip():
+        st.error("❌ Alokasi waktu tidak boleh kosong!")
+        valid = False
+    else:
+        if not time_minutes.isdigit():
+            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 70)")
+            valid = False
+        elif len(time_minutes) > 3:
+            st.error("❌ Alokasi waktu maksimal 3 digit! (contoh: 70 atau 120, maksimal 999)")
+            valid = False
+        elif int(time_minutes) < 10:
+            st.error("❌ Alokasi waktu minimal 10 menit!")
             valid = False
     
     if valid:
@@ -219,6 +236,14 @@ if submitted:
             2. PROFIL PELAJAR PANCASILA
             3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
             4. PENILAIAN
+            
+            Gunakan format:
+            ## untuk judul utama
+            ### untuk sub judul
+            - untuk list
+            **teks** untuk penekanan
+            
+            Langsung ke konten, tanpa kata pengantar.
             """
             
             result = call_gemini(prompt)
@@ -227,27 +252,31 @@ if submitted:
                 st.session_state.generated_content = result
                 st.session_state.is_generated = True
                 st.success("✅ Lesson Plan berhasil dibuat!")
+            else:
+                st.error("Gagal menghasilkan. Silakan coba lagi.")
 
-
+# --- Tampilkan hasil jika ada ---
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
-
+    
     doc_file = create_word_document(
-        st.session_state.generated_content,
+        st.session_state.generated_content, 
         st.session_state.current_topic[:50]
     )
-
-    st.download_button(
-        label="📥 Download Lesson Plan (Word)",
-        data=doc_file,
-        file_name=f"Lesson_Plan_{int(time.time())}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
-
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.download_button(
+            label="📥 Download Lesson Plan (Word)",
+            data=doc_file,
+            file_name=f"Lesson_Plan_{int(time.time())}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+    
     st.divider()
-
+    
     st.subheader("📄 Preview")
-
-    st.markdown(st.session_state.generated_content, unsafe_allow_html=False)
-
+    st.markdown(st.session_state.generated_content, unsafe_allow_html=True)
+    
     st.caption("💡 Download file Word untuk hasil cetak yang rapi.")
