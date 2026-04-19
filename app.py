@@ -70,7 +70,17 @@ def create_word_document(content, topic_name):
         elif line.startswith('##'):
             doc.add_heading(line.replace('##', '').strip(), level=2)
         elif line.startswith('-') or line.startswith('*'):
-            doc.add_paragraph(line[1:].strip(), style='List Bullet')
+            para = doc.add_paragraph(style='List Bullet')
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip())
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = para.add_run(part[2:-2])
+                    run.bold = True
+                elif part.startswith('*') and part.endswith('*'):
+                    run = para.add_run(part[1:-1])
+                    run.italic = True
+                else:
+                    para.add_run(part)
         else:
             para = doc.add_paragraph()
             parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line)
