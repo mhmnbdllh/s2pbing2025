@@ -118,7 +118,7 @@ with st.form("lesson_form"):
         height=80,
         placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
         help="Minimal 3 kata, maksimal 100 kata (MAX 500 KARAKTER)",
-        max_chars=500  # MEMBATASI FISIK INPUT
+        max_chars=500
     )
     
     col1, col2 = st.columns(2)
@@ -130,20 +130,20 @@ with st.form("lesson_form"):
             "🎯 Standar 1 (Capaian Pembelajaran)", 
             height=60,
             help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125  # 25 kata × 5 huruf
+            max_chars=125
         )
         std2 = st.text_area(
             "📝 Standar 2 (Tujuan Pembelajaran)", 
             height=60,
             help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125  # 25 kata × 5 huruf
+            max_chars=125
         )
     
     time_minutes = st.text_input(
         "⏰ Alokasi Waktu (Menit)",
         placeholder="Contoh: 70",
         help="Hanya angka, maksimal 3 digit (contoh: 70, 90, 120)",
-        max_chars=3  # MAKSIMAL 3 DIGIT
+        max_chars=3
     )
     
     submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
@@ -152,7 +152,6 @@ with st.form("lesson_form"):
 if submitted:
     valid = True
     
-    # Validasi TOPIK (min 3 kata, max 100 kata)
     if not topic.strip():
         st.error("❌ Topik tidak boleh kosong!")
         valid = False
@@ -165,7 +164,6 @@ if submitted:
             st.error(f"❌ Topik maksimal 100 kata! Saat ini: {word_count_topic} kata")
             valid = False
     
-    # Validasi STANDAR 1 (min 2 kata, max 25 kata)
     if not std1.strip():
         st.error("❌ Standar 1 tidak boleh kosong!")
         valid = False
@@ -178,7 +176,6 @@ if submitted:
             st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
             valid = False
     
-    # Validasi STANDAR 2 (min 2 kata, max 25 kata)
     if not std2.strip():
         st.error("❌ Standar 2 tidak boleh kosong!")
         valid = False
@@ -191,7 +188,6 @@ if submitted:
             st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
             valid = False
     
-    # Validasi WAKTU (hanya angka, max 3 digit)
     if not time_minutes.strip():
         st.error("❌ Alokasi waktu tidak boleh kosong!")
         valid = False
@@ -210,32 +206,44 @@ if submitted:
         st.session_state.current_topic = topic
         
         with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
+            # --- PERBAIKAN: STRUKTUR DINAMIS BERDASARKAN BAHASA ---
+            if language == "Indonesian":
+                struktur = """
+                1. KOMPETENSI AWAL
+                2. PROFIL PELAJAR PANCASILA
+                3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
+                4. PENILAIAN
+                """
+                waktu_unit = "Menit"
+            else:
+                struktur = """
+                1. INITIAL COMPETENCIES
+                2. PANCASILA STUDENT PROFILE
+                3. LEARNING ACTIVITIES (Opening, Core, Closing)
+                4. ASSESSMENT
+                """
+                waktu_unit = "minutes"
+            
             prompt = f"""
-            Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
+            Buat Lesson Plan dalam BAHASA {language} MURNI. Jangan campur dengan bahasa lain.
             
-            Topik: {topic}
-            Bahasa: {language}
-            Kelas: {grade}
-            Standar 1: {std1}
-            Standar 2: {std2}
-            Alokasi Waktu: {time_minutes} Menit
+            Detail:
+            Topic: {topic}
+            Grade: {grade}
+            Standard 1: {std1}
+            Standard 2: {std2}
+            Time: {time_minutes} {waktu_unit}
             
-            Integrasikan kearifan lokal Jawa Timur.
+            Integrate local wisdom of East Java.
             
-            Struktur:
-            1. KOMPETENSI AWAL
-            2. PROFIL PELAJAR PANCASILA
-            3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
-            4. PENILAIAN
+            Structure (dalam {language}):
+            {struktur}
             
-            Gunakan format:
-            ## untuk judul utama
-            ### untuk sub judul
-            - untuk list
-            **teks** untuk penekanan
+            Format: ## untuk judul, ### untuk sub judul, - untuk list, **teks** untuk penekanan.
             
-            Langsung ke konten, tanpa kata pengantar.
+            Mulai langsung ke konten, tanpa kata pengantar.
             """
+            # --- END OF PROMPT ---
             
             result = call_gemini(prompt)
             
