@@ -61,66 +61,66 @@ def create_word_document(content, topic_name):
     doc.add_paragraph('_' * 50)
     
     lines = content.split('\n')
-for line in lines:
-    line = line.strip()
-    if not line:
-        doc.add_paragraph()
-
-    # Heading level 1 (#)
-    elif line.startswith('#'):
-        para = doc.add_heading(level=1)
-        parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip())
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = para.add_run(part[2:-2]); run.bold = True
-            elif part.startswith('*') and part.endswith('*'):
-                run = para.add_run(part[1:-1]); run.italic = True
+    for line in lines:
+        line = line.strip()
+        if not line:
+            doc.add_paragraph()
+    
+        # Heading level 1 (#)
+        elif line.startswith('#'):
+            para = doc.add_heading(level=1)
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip())
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = para.add_run(part[2:-2]); run.bold = True
+                elif part.startswith('*') and part.endswith('*'):
+                    run = para.add_run(part[1:-1]); run.italic = True
+                else:
+                    para.add_run(part)
+    
+        # Heading level 2 (##)
+        elif line.startswith('##'):
+            doc.add_heading(line.replace('##', '').strip(), level=2)
+    
+        # Heading level 3 (###)
+        elif line.startswith('###'):
+            doc.add_heading(line.replace('###', '').strip(), level=3)
+    
+        # Bullet list
+        elif line.startswith('-') or line.startswith('*'):
+            para = doc.add_paragraph(style='List Bullet')
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip())
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = para.add_run(part[2:-2]); run.bold = True
+                elif part.startswith('*') and part.endswith('*'):
+                    run = para.add_run(part[1:-1]); run.italic = True
+                else:
+                    run = para.add_run(part)
+    
+        # Tabel Markdown
+        elif '|' in line:
+            cells = [c.strip() for c in line.split('|') if c.strip()]
+            if not hasattr(doc, 'current_table'):
+                doc.current_table = doc.add_table(rows=1, cols=len(cells))
+                hdr_cells = doc.current_table.rows[0].cells
+                for i, cell in enumerate(cells):
+                    hdr_cells[i].text = cell
             else:
-                para.add_run(part)
-
-    # Heading level 2 (##)
-    elif line.startswith('##'):
-        doc.add_heading(line.replace('##', '').strip(), level=2)
-
-    # Heading level 3 (###)
-    elif line.startswith('###'):
-        doc.add_heading(line.replace('###', '').strip(), level=3)
-
-    # Bullet list
-    elif line.startswith('-') or line.startswith('*'):
-        para = doc.add_paragraph(style='List Bullet')
-        parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line[1:].strip())
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = para.add_run(part[2:-2]); run.bold = True
-            elif part.startswith('*') and part.endswith('*'):
-                run = para.add_run(part[1:-1]); run.italic = True
-            else:
-                run = para.add_run(part)
-
-    # Tabel Markdown
-    elif '|' in line:
-        cells = [c.strip() for c in line.split('|') if c.strip()]
-        if not hasattr(doc, 'current_table'):
-            doc.current_table = doc.add_table(rows=1, cols=len(cells))
-            hdr_cells = doc.current_table.rows[0].cells
-            for i, cell in enumerate(cells):
-                hdr_cells[i].text = cell
+                row_cells = doc.current_table.add_row().cells
+                for i, cell in enumerate(cells):
+                    row_cells[i].text = cell
         else:
-            row_cells = doc.current_table.add_row().cells
-            for i, cell in enumerate(cells):
-                row_cells[i].text = cell
-    else:
-        # Paragraf biasa dengan bold/italic
-        para = doc.add_paragraph()
-        parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line)
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = para.add_run(part[2:-2]); run.bold = True
-            elif part.startswith('*') and part.endswith('*'):
-                run = para.add_run(part[1:-1]); run.italic = True
-            else:
-                para.add_run(part)
+            # Paragraf biasa dengan bold/italic
+            para = doc.add_paragraph()
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line)
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = para.add_run(part[2:-2]); run.bold = True
+                elif part.startswith('*') and part.endswith('*'):
+                    run = para.add_run(part[1:-1]); run.italic = True
+                else:
+                    para.add_run(part)
     
     from datetime import datetime
     footer = doc.sections[0].footer
