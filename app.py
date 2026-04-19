@@ -117,7 +117,8 @@ with st.form("lesson_form"):
         "📖 **Topik Pembelajaran**",
         height=80,
         placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
-        help="Minimal 3 kata, maksimal 100 kata"
+        help="Minimal 3 kata, maksimal 100 kata (MAX 500 KARAKTER)",
+        max_chars=500  # MEMBATASI FISIK INPUT
     )
     
     col1, col2 = st.columns(2)
@@ -128,18 +129,21 @@ with st.form("lesson_form"):
         std1 = st.text_area(
             "🎯 Standar 1 (Capaian Pembelajaran)", 
             height=60,
-            help="Minimal 2 kata, maksimal 25 kata"
+            help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
+            max_chars=125  # 25 kata × 5 huruf
         )
         std2 = st.text_area(
             "📝 Standar 2 (Tujuan Pembelajaran)", 
             height=60,
-            help="Minimal 2 kata, maksimal 25 kata"
+            help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
+            max_chars=125  # 25 kata × 5 huruf
         )
     
     time_minutes = st.text_input(
         "⏰ Alokasi Waktu (Menit)",
-        placeholder="Contoh: 60",
-        help="Hanya angka, maksimal 3 digit (contoh: 60, 90, 120)"
+        placeholder="Contoh: 70",
+        help="Hanya angka, maksimal 3 digit (contoh: 70, 90, 120)",
+        max_chars=3  # MAKSIMAL 3 DIGIT
     )
     
     submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
@@ -162,7 +166,10 @@ if submitted:
             valid = False
     
     # Validasi STANDAR 1 (min 2 kata, max 25 kata)
-    if std1.strip():
+    if not std1.strip():
+        st.error("❌ Standar 1 tidak boleh kosong!")
+        valid = False
+    else:
         word_count_std1 = len(std1.strip().split())
         if word_count_std1 < 2:
             st.error(f"❌ Standar 1 minimal 2 kata! Saat ini: {word_count_std1} kata")
@@ -170,12 +177,12 @@ if submitted:
         elif word_count_std1 > 25:
             st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
             valid = False
-    else:
-        st.error("❌ Standar 1 tidak boleh kosong!")
-        valid = False
     
     # Validasi STANDAR 2 (min 2 kata, max 25 kata)
-    if std2.strip():
+    if not std2.strip():
+        st.error("❌ Standar 2 tidak boleh kosong!")
+        valid = False
+    else:
         word_count_std2 = len(std2.strip().split())
         if word_count_std2 < 2:
             st.error(f"❌ Standar 2 minimal 2 kata! Saat ini: {word_count_std2} kata")
@@ -183,23 +190,20 @@ if submitted:
         elif word_count_std2 > 25:
             st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
             valid = False
-    else:
-        st.error("❌ Standar 2 tidak boleh kosong!")
-        valid = False
     
-    # Validasi WAKTU
+    # Validasi WAKTU (hanya angka, max 3 digit)
     if not time_minutes.strip():
         st.error("❌ Alokasi waktu tidak boleh kosong!")
         valid = False
     else:
         if not time_minutes.isdigit():
-            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 120)")
+            st.error("❌ Alokasi waktu harus berupa ANGKA saja (contoh: 70)")
             valid = False
         elif len(time_minutes) > 3:
-            st.error("❌ Alokasi waktu maksimal 3 digit! (contoh: 45 atau 120)")
+            st.error("❌ Alokasi waktu maksimal 3 digit! (contoh: 70 atau 120, maksimal 999)")
             valid = False
-        elif int(time_minutes) < 30:
-            st.error("❌ Alokasi waktu minimal 30 menit!")
+        elif int(time_minutes) < 10:
+            st.error("❌ Alokasi waktu minimal 10 menit!")
             valid = False
     
     if valid:
@@ -242,7 +246,7 @@ if submitted:
             else:
                 st.error("Gagal menghasilkan. Silakan coba lagi.")
 
-
+# --- Tampilkan hasil jika ada ---
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
     
