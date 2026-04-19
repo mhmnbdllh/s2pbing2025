@@ -44,7 +44,7 @@ kelas_options = [
     "Kelas X SMA", "Kelas XI SMA", "Kelas XII SMA"
 ]
 
-# --- Fungsi membuat file Word (DIPERBAIKI) ---
+# --- Fungsi membuat file Word ---
 def create_word_document(content, topic_name):
     doc = Document()
     
@@ -65,31 +65,15 @@ def create_word_document(content, topic_name):
         line = line.strip()
         if not line:
             doc.add_paragraph()
-            continue
-        
-        # Hapus semua markdown bold (**teks**)
-        line = re.sub(r'\*\*([^*]+)\*\*', r'\1', line)
-        
-        # Heading level 2 (##)
-        if line.startswith('##'):
-            heading_text = line.lstrip('#').strip()
-            doc.add_heading(heading_text, level=2)
-            continue
-        
-        # Heading level 3 (###)
-        if line.startswith('###'):
-            heading_text = line.lstrip('#').strip()
-            doc.add_heading(heading_text, level=3)
-            continue
-        
-        # List bullet dengan - atau *
-        if line.startswith('-') or line.startswith('*'):
-            bullet_text = line[1:].strip()
-            doc.add_paragraph(bullet_text, style='List Bullet')
-            continue
-        
-        # Paragraf biasa
-        doc.add_paragraph(line)
+        elif line.startswith('##'):
+            doc.add_heading(line.replace('##', '').strip(), level=2)
+        elif line.startswith('###'):
+            doc.add_heading(line.replace('###', '').strip(), level=3)
+        elif line.startswith('-') or line.startswith('*'):
+            doc.add_paragraph(line[1:].strip(), style='List Bullet')
+        else:
+            clean_line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
+            doc.add_paragraph(clean_line)
     
     from datetime import datetime
     footer = doc.sections[0].footer
@@ -103,17 +87,9 @@ def create_word_document(content, topic_name):
     doc_bytes.seek(0)
     return doc_bytes
 
-# --- Fungsi panggil Gemini dengan System Instruction ---
-def call_gemini(prompt_text, language):
-    if language == "Indonesian":
-        system_instruction = "Anda adalah asisten guru yang hanya merespon dalam Bahasa Indonesia. Anda tidak pernah menggunakan Bahasa Inggris sama sekali. Semua judul, deskripsi, dan konten harus dalam Bahasa Indonesia murni."
-    else:
-        system_instruction = "You are a teacher assistant who only responds in English. You never use Indonesian language at all. All headings, descriptions, and content must be in pure English."
-    
-    model = genai.GenerativeModel(
-        MODEL_NAME,
-        system_instruction=system_instruction
-    )
+# --- Fungsi panggil Gemini ---
+def call_gemini(prompt_text):
+    model = genai.GenerativeModel(MODEL_NAME)
     
     for attempt in range(3):
         try:
@@ -142,7 +118,7 @@ with st.form("lesson_form"):
         height=80,
         placeholder="Contoh: Memperkenalkan Tari Remo kepada siswa",
         help="Minimal 3 kata, maksimal 100 kata (MAX 500 KARAKTER)",
-        max_chars=500
+        max_chars=500  # MEMBATASI FISIK INPUT
     )
     
     col1, col2 = st.columns(2)
@@ -154,20 +130,20 @@ with st.form("lesson_form"):
             "🎯 Standar 1 (Capaian Pembelajaran)", 
             height=60,
             help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125
+            max_chars=125  # 25 kata × 5 huruf
         )
         std2 = st.text_area(
             "📝 Standar 2 (Tujuan Pembelajaran)", 
             height=60,
             help="Minimal 2 kata, maksimal 25 kata (MAX 125 KARAKTER)",
-            max_chars=125
+            max_chars=125  # 25 kata × 5 huruf
         )
     
     time_minutes = st.text_input(
         "⏰ Alokasi Waktu (Menit)",
         placeholder="Contoh: 70",
         help="Hanya angka, maksimal 3 digit (contoh: 70, 90, 120)",
-        max_chars=3
+        max_chars=3  # MAKSIMAL 3 DIGIT
     )
     
     submitted = st.form_submit_button("🚀 Generate Lesson Plan", use_container_width=True)
@@ -176,6 +152,7 @@ with st.form("lesson_form"):
 if submitted:
     valid = True
     
+    # Validasi TOPIK (min 3 kata, max 100 kata)
     if not topic.strip():
         st.error("❌ Topik tidak boleh kosong!")
         valid = False
@@ -188,6 +165,7 @@ if submitted:
             st.error(f"❌ Topik maksimal 100 kata! Saat ini: {word_count_topic} kata")
             valid = False
     
+    # Validasi STANDAR 1 (min 2 kata, max 25 kata)
     if not std1.strip():
         st.error("❌ Standar 1 tidak boleh kosong!")
         valid = False
@@ -200,6 +178,7 @@ if submitted:
             st.error(f"❌ Standar 1 maksimal 25 kata! Saat ini: {word_count_std1} kata")
             valid = False
     
+    # Validasi STANDAR 2 (min 2 kata, max 25 kata)
     if not std2.strip():
         st.error("❌ Standar 2 tidak boleh kosong!")
         valid = False
@@ -212,6 +191,7 @@ if submitted:
             st.error(f"❌ Standar 2 maksimal 25 kata! Saat ini: {word_count_std2} kata")
             valid = False
     
+    # Validasi WAKTU (hanya angka, max 3 digit)
     if not time_minutes.strip():
         st.error("❌ Alokasi waktu tidak boleh kosong!")
         valid = False
@@ -231,26 +211,33 @@ if submitted:
         
         with st.spinner("AI sedang menyusun Rencana Pembelajaran..."):
             prompt = f"""
-            Buat Lesson Plan dengan detail:
+            Buat Rencana Pelaksanaan Pembelajaran (RPP) dengan detail berikut:
+            
             Topik: {topic}
+            Bahasa: {language}
             Kelas: {grade}
             Standar 1: {std1}
             Standar 2: {std2}
-            Waktu: {time_minutes} menit
-
-            OUTPUTNYA WAJIB DALAM 1 BAHASA (FULL ENGLISH ATAU FULL INDONESIA, BERDASARKAN Language {language}. Integrasikan kearifan lokal Jawa Timur.
+            Alokasi Waktu: {time_minutes} Menit
+            
+            Integrasikan kearifan lokal Jawa Timur.
             
             Struktur:
-            1. Kompetensi Awal
-            2. Profil Pelajar Pancasila
-            3. Kegiatan Pembelajaran (Pendahuluan, Inti, Penutup)
-            4. Penilaian
+            1. KOMPETENSI AWAL
+            2. PROFIL PELAJAR PANCASILA
+            3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
+            4. PENILAIAN
             
-            Gunakan format ## untuk judul, ### untuk sub judul, - untuk list.
-            Langsung ke konten.
+            Gunakan format:
+            ## untuk judul utama
+            ### untuk sub judul
+            - untuk list
+            **teks** untuk penekanan
+            
+            Langsung ke konten, tanpa kata pengantar.
             """
             
-            result = call_gemini(prompt, language)
+            result = call_gemini(prompt)
             
             if result:
                 st.session_state.generated_content = result
@@ -259,6 +246,7 @@ if submitted:
             else:
                 st.error("Gagal menghasilkan. Silakan coba lagi.")
 
+# --- Tampilkan hasil jika ada ---
 if st.session_state.is_generated and st.session_state.generated_content:
     st.divider()
     
@@ -282,4 +270,4 @@ if st.session_state.is_generated and st.session_state.generated_content:
     st.subheader("📄 Preview")
     st.markdown(st.session_state.generated_content)
     
-    st.caption("💡 Preview hanya untuk dilihat. Download file Word untuk hasil cetak yang rapi.")
+    st.caption("💡 Download file Word untuk hasil cetak yang rapi.")
