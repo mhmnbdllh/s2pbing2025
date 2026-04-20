@@ -9,18 +9,18 @@ from docx.oxml import OxmlElement
 from io import BytesIO
 import re
 
-# --- Konfigurasi Halaman ---
+
 st.set_page_config(
     page_title="AI Lesson Plan Generator",
     page_icon="📚",
     layout="centered"
 )
 
-# --- Header ---
+
 st.title("📚 AI Lesson Plan Generator")
 st.caption("DESIGNED AND DEVELOPED BY S2PBING2025A | Generate RPP dengan muatan kearifan lokal Jawa Timur")
 
-# --- Ambil API Key dari Streamlit Secrets ---
+
 try:
     gemini_api_key = st.secrets["GEMINI_API_KEY"]
 except:
@@ -31,7 +31,7 @@ except:
 MODEL_NAME = "gemini-2.5-flash"
 genai.configure(api_key=gemini_api_key)
 
-# --- Session State ---
+
 if 'generated_content' not in st.session_state:
     st.session_state.generated_content = None
 if 'is_generated' not in st.session_state:
@@ -39,7 +39,7 @@ if 'is_generated' not in st.session_state:
 if 'current_topic' not in st.session_state:
     st.session_state.current_topic = ""
 
-# --- Dropdown Kelas ---
+
 kelas_options = [
     "Kelas 1 SD", "Kelas 2 SD", "Kelas 3 SD", "Kelas 4 SD", "Kelas 5 SD", "Kelas 6 SD",
     "Kelas VII SMP", "Kelas VIII SMP", "Kelas IX SMP",
@@ -235,7 +235,7 @@ def create_word_document(content, topic_name):
             doc.add_paragraph()
             continue
 
-        # Heading  # / ## / ### / ####
+        # Headings
         m = re.match(r'^(#{1,4})\s+(.*)', stripped)
         if m:
             doc.add_heading(_strip_markdown(m.group(2)), level=min(len(m.group(1)), 4))
