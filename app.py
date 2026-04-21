@@ -440,13 +440,13 @@ if submitted:
             Standar 2: {std2}
             Alokasi Waktu: {time_minutes} Menit
 
-            Integrasikan kearifan lokal Jawa Timur dalam instruksi/materi/aktivitas pembelajaran. OUTPUT WAJIB MENGGUNAKAN BAHASA {language} YANG DIPILIH.
+            Integrasikan kearifan lokal Jawa Timur dalam instruksi/materi/aktivitas pembelajaran.
 
             Struktur:
             1. KOMPETENSI AWAL
             2. PROFIL PELAJAR PANCASILA
             3. KEGIATAN PEMBELAJARAN (Pendahuluan, Inti, Penutup)
-            4. ASESMEN dan PENILAIAN (dalam tabel).
+            4. PENILAIAN
 
             Langsung ke konten, tanpa kata pengantar, tanpa kesimpulan. Jangan berdialog. Selesaikan RPP sesuai batas token, JANGAN memotong di tengah kalimat, heading, list, atau tabel.
             """
